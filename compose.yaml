@@ -1,0 +1,74 @@
+services:
+  mqtt:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mqtt-data:/mosquitto/data
+
+  influxdb:
+    image: influxdb:2.7
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_USERNAME}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN}
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+
+  telegraf:
+    image: telegraf:1.36
+    restart: unless-stopped
+    depends_on:
+      - mqtt
+      - influxdb
+    environment:
+      MQTT_TOPIC: ${MQTT_TOPIC}
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN}
+      INFLUXDB_ORG: ${INFLUXDB_ORG}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET}
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+
+  simulator:
+    build: ./simulator
+    restart: unless-stopped
+    depends_on:
+      - mqtt
+      - telegraf
+    environment:
+      MQTT_HOST: mqtt
+      MQTT_PORT: "1883"
+      MQTT_TOPIC: ${MQTT_TOPIC}
+      SENSOR_INTERVAL_SECONDS: ${SENSOR_INTERVAL_SECONDS}
+
+  grafana:
+    image: grafana/grafana:12.2.0
+    restart: unless-stopped
+    depends_on:
+      - influxdb
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USERNAME}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN}
+      INFLUXDB_ORG: ${INFLUXDB_ORG}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+
+volumes:
+  mqtt-data:
+  influxdb-data:
+  influxdb-config:
+  grafana-data:
