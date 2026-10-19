@@ -1,4 +1,4 @@
-# ESP32-Simulation: Schritt für Schritt
+# ESP32-Simulation: Schritt für Schritt von Chatti
 
 ## 1. Was ist die Aufgabe?
 
